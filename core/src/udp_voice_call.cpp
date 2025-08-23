@@ -419,6 +419,13 @@ private:
                 int received = recvfrom(socket_fd_, buffer, sizeof(buffer), 0, 
                                        (struct sockaddr*)&from_addr, &from_len);
                 if (received > 0) {
+                    static auto last_network_print = std::chrono::steady_clock::now();
+                    auto now = std::chrono::steady_clock::now();
+                    if (now - last_network_print > std::chrono::seconds(5)) {
+                        std::cout << "网络线程收到数据: " << received << " bytes, 来自=" 
+                                  << inet_ntoa(from_addr.sin_addr) << ":" << ntohs(from_addr.sin_port) << std::endl;
+                        last_network_print = now;
+                    }
                     ProcessNetworkMessage(buffer, received, from_addr);
                 }
             }
@@ -443,7 +450,6 @@ private:
         memcpy(packet.data, data, size);
         
         int packet_size = sizeof(packet) - sizeof(packet.data) + size;
-        std::cout << "DEBUG: sizeof(packet)=" << sizeof(packet) << ", sizeof(packet.data)=" << sizeof(packet.data) << ", size=" << size << ", packet_size=" << packet_size << std::endl;
         int sent = sendto(socket_fd_, &packet, packet_size, 0,
                (struct sockaddr*)&server_addr_, sizeof(server_addr_));
         
