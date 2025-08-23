@@ -370,9 +370,12 @@ private:
                     AudioPacket packet = audio_queue_.front();
                     audio_queue_.pop();
                     
+                    // 转换字节序
+                    uint16_t data_size = ntohs(packet.data_size);
+                    
                     // 应用音量
-                    std::vector<int16_t> playback_buffer(packet.data_size / 2);
-                    memcpy(playback_buffer.data(), packet.data, packet.data_size);
+                    std::vector<int16_t> playback_buffer(data_size / 2);
+                    memcpy(playback_buffer.data(), packet.data, data_size);
                     
                     for (int i = 0; i < playback_buffer.size(); ++i) {
                         playback_buffer[i] = static_cast<int16_t>(playback_buffer[i] * speaker_volume_);
