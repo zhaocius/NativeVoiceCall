@@ -434,7 +434,7 @@ private:
     
     void SendAudioPacket(const void* data, size_t size) {
         // 限制音频数据大小，避免UDP包过大
-        const size_t max_audio_size = 1200; // 增加音频数据大小，提高音质
+        const size_t max_audio_size = 960; // 保持960字节，确保包大小合理
         
         if (size > max_audio_size) {
             size = max_audio_size;

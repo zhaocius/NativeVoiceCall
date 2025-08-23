@@ -168,12 +168,12 @@ private:
                 std::cout << "尝试解析音频包: length=" << length << ", sequence=" << sequence 
                           << ", timestamp=" << timestamp << ", user_id=" << user_id 
                           << ", raw_data_size=0x" << std::hex << raw_data_size << std::dec
-                          << ", data_size=" << data_size << ", 验证=" << (data_size <= 2048 && length >= (16 + data_size)) << std::endl;
+                          << ", data_size=" << data_size << ", 验证=" << (data_size <= 2048 && length >= (14 + data_size)) << std::endl;
                 last_audio_print = now;
             }
             
             // 验证数据大小是否合理
-            if (data_size <= 2048 && length >= (16 + data_size)) {
+            if (data_size <= 2048 && length >= (14 + data_size)) {
                 // 这是一个AudioPacket，直接广播给房间内其他用户
                 std::string client_key = inet_ntoa(from_addr.sin_addr) + std::string(":") + 
                                        std::to_string(ntohs(from_addr.sin_port));
