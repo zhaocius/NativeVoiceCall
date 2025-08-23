@@ -423,6 +423,13 @@ private:
     }
     
     void SendAudioPacket(const void* data, size_t size) {
+        // 限制音频数据大小，避免UDP包过大
+        const size_t max_audio_size = 960; // 限制为960字节，确保总包大小不超过1024
+        
+        if (size > max_audio_size) {
+            size = max_audio_size;
+        }
+        
         AudioPacket packet;
         packet.sequence = htonl(sequence_++);
         packet.timestamp = htonl(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -430,16 +437,15 @@ private:
         packet.user_id = htonl(std::hash<std::string>{}(config_.user_id));
         packet.data_size = htons(size);
         
-        if (size > sizeof(packet.data)) {
-            size = sizeof(packet.data);
-        }
         memcpy(packet.data, data, size);
         
-        int sent = sendto(socket_fd_, &packet, sizeof(packet) - sizeof(packet.data) + size, 0,
+        int packet_size = sizeof(packet) - sizeof(packet.data) + size;
+        std::cout << "DEBUG: sizeof(packet)=" << sizeof(packet) << ", sizeof(packet.data)=" << sizeof(packet.data) << ", size=" << size << ", packet_size=" << packet_size << std::endl;
+        int sent = sendto(socket_fd_, &packet, packet_size, 0,
                (struct sockaddr*)&server_addr_, sizeof(server_addr_));
         
         if (sent > 0) {
-            std::cout << "发送音频包: 大小=" << sent << " bytes, 序列=" << packet.sequence << std::endl;
+            std::cout << "发送音频包: 原始大小=" << size << ", 包大小=" << packet_size << ", 发送=" << sent << " bytes, 序列=" << ntohl(packet.sequence) << std::endl;
         } else {
             std::cout << "发送音频包失败: " << strerror(errno) << std::endl;
         }

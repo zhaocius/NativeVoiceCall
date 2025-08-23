@@ -154,14 +154,16 @@ private:
             uint32_t sequence = ntohl(header[0]);
             uint32_t timestamp = ntohl(header[1]);
             uint32_t user_id = ntohl(header[2]);
-            uint16_t data_size = ntohs(*reinterpret_cast<const uint16_t*>(message + 12));
+            uint16_t raw_data_size = *reinterpret_cast<const uint16_t*>(message + 12);
+            uint16_t data_size = ntohs(raw_data_size);
             
             std::cout << "尝试解析音频包: length=" << length << ", sequence=" << sequence 
                       << ", timestamp=" << timestamp << ", user_id=" << user_id 
-                      << ", data_size=" << data_size << std::endl;
+                      << ", raw_data_size=0x" << std::hex << raw_data_size << std::dec
+                      << ", data_size=" << data_size << ", 验证=" << (data_size <= 2048 && length >= (14 + data_size)) << std::endl;
             
             // 验证数据大小是否合理
-            if (data_size <= 1024 && length >= (16 + data_size)) {
+            if (data_size <= 2048 && length >= (14 + data_size)) {
                 // 这是一个AudioPacket，直接广播给房间内其他用户
                 std::string client_key = inet_ntoa(from_addr.sin_addr) + std::string(":") + 
                                        std::to_string(ntohs(from_addr.sin_port));
