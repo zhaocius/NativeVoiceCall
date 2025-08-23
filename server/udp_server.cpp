@@ -109,9 +109,9 @@ public:
         running_ = true;
         server_thread_ = std::thread(&UDPServer::ServerLoop, this);
         
-        // 运行一段时间后自动停止
-        std::cout << "Server running for 30 seconds..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(30));
+        // 等待用户输入退出
+        std::cout << "Press Enter to stop server..." << std::endl;
+        std::cin.get();
         
         Stop();
     }
@@ -139,22 +139,67 @@ private:
                                    (struct sockaddr*)&client_addr, &client_len);
             if (received > 0) {
                 buffer[received] = '\0';
+                std::cout << "收到UDP包: 大小=" << received << " bytes, 来自=" 
+                          << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << std::endl;
                 ProcessMessage(buffer, received, client_addr);
             }
         }
     }
     
     void ProcessMessage(const char* message, int length, const struct sockaddr_in& from_addr) {
+        // 首先检查是否是AudioPacket结构体
+        if (length >= 16) { // AudioPacket的最小大小
+            // 尝试解析为AudioPacket
+            const uint32_t* header = reinterpret_cast<const uint32_t*>(message);
+            uint32_t sequence = ntohl(header[0]);
+            uint32_t timestamp = ntohl(header[1]);
+            uint32_t user_id = ntohl(header[2]);
+            uint16_t data_size = ntohs(*reinterpret_cast<const uint16_t*>(message + 12));
+            
+            std::cout << "尝试解析音频包: length=" << length << ", sequence=" << sequence 
+                      << ", timestamp=" << timestamp << ", user_id=" << user_id 
+                      << ", data_size=" << data_size << std::endl;
+            
+            // 验证数据大小是否合理
+            if (data_size <= 1024 && length >= (16 + data_size)) {
+                // 这是一个AudioPacket，直接广播给房间内其他用户
+                std::string client_key = inet_ntoa(from_addr.sin_addr) + std::string(":") + 
+                                       std::to_string(ntohs(from_addr.sin_port));
+                
+                // 查找用户所在的房间
+                std::cout << "查找用户房间: " << client_key << std::endl;
+                std::cout << "当前房间数量: " << rooms_.size() << std::endl;
+                
+                for (const auto& room_pair : rooms_) {
+                    std::cout << "房间 " << room_pair.first << " 中的用户: ";
+                    for (const auto& user : room_pair.second) {
+                        std::cout << user << " ";
+                    }
+                    std::cout << std::endl;
+                    
+                    if (room_pair.second.find(client_key) != room_pair.second.end()) {
+                        // 找到房间，广播音频包
+                        std::cout << "转发音频包: 房间=" << room_pair.first 
+                                  << ", 用户=" << client_key 
+                                  << ", 数据大小=" << data_size << " bytes" << std::endl;
+                        BroadcastAudioPacket(room_pair.first, message, length, from_addr);
+                        return;
+                    }
+                }
+                std::cout << "警告: 未找到用户 " << client_key << " 所在的房间" << std::endl;
+                return;
+            }
+        }
+        
+        // 处理字符串消息
         std::string msg(message, length);
         
-        std::cout << "收到消息: " << msg << " 来自: " << inet_ntoa(from_addr.sin_addr) << ":" << ntohs(from_addr.sin_port) << std::endl;
-        
         if (msg.find("JOIN:") == 0) {
+            std::cout << "收到JOIN消息: " << msg << " 来自: " << inet_ntoa(from_addr.sin_addr) << ":" << ntohs(from_addr.sin_port) << std::endl;
             HandleJoin(msg, from_addr);
         } else if (msg.find("LEAVE:") == 0) {
+            std::cout << "收到LEAVE消息: " << msg << " 来自: " << inet_ntoa(from_addr.sin_addr) << ":" << ntohs(from_addr.sin_port) << std::endl;
             HandleLeave(msg, from_addr);
-        } else if (msg.find("AUDIO:") == 0) {
-            HandleAudio(msg, from_addr);
         }
     }
     
@@ -211,17 +256,7 @@ private:
         }
     }
     
-    void HandleAudio(const std::string& message, const struct sockaddr_in& from_addr) {
-        size_t pos1 = message.find(':', 6);
-        size_t pos2 = message.find(':', pos1 + 1);
-        if (pos1 != std::string::npos && pos2 != std::string::npos) {
-            std::string room_id = message.substr(6, pos1 - 6);
-            std::string user_id = message.substr(pos1 + 1, pos2 - pos1 - 1);
-            
-            // 广播音频数据给房间内其他用户
-            BroadcastToRoom(room_id, message, from_addr);
-        }
-    }
+
     
     void BroadcastToRoom(const std::string& room_id, const std::string& message, 
                         const struct sockaddr_in& exclude_addr) {
@@ -236,6 +271,25 @@ private:
                     client.addr.sin_port != exclude_addr.sin_port) {
                     
                     sendto(server_fd_, message.c_str(), message.length(), 0,
+                           (struct sockaddr*)&client.addr, sizeof(client.addr));
+                }
+            }
+        }
+    }
+    
+    void BroadcastAudioPacket(const std::string& room_id, const char* data, int length,
+                             const struct sockaddr_in& exclude_addr) {
+        if (rooms_.find(room_id) == rooms_.end()) {
+            return;
+        }
+        
+        for (const auto& client_key : rooms_[room_id]) {
+            if (clients_.find(client_key) != clients_.end()) {
+                const auto& client = clients_[client_key];
+                if (client.addr.sin_addr.s_addr != exclude_addr.sin_addr.s_addr ||
+                    client.addr.sin_port != exclude_addr.sin_port) {
+                    
+                    sendto(server_fd_, data, length, 0,
                            (struct sockaddr*)&client.addr, sizeof(client.addr));
                 }
             }

@@ -424,19 +424,25 @@ private:
     
     void SendAudioPacket(const void* data, size_t size) {
         AudioPacket packet;
-        packet.sequence = sequence_++;
-        packet.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        packet.user_id = std::hash<std::string>{}(config_.user_id);
-        packet.data_size = size;
+        packet.sequence = htonl(sequence_++);
+        packet.timestamp = htonl(std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+        packet.user_id = htonl(std::hash<std::string>{}(config_.user_id));
+        packet.data_size = htons(size);
         
         if (size > sizeof(packet.data)) {
             size = sizeof(packet.data);
         }
         memcpy(packet.data, data, size);
         
-        sendto(socket_fd_, &packet, sizeof(packet) - sizeof(packet.data) + size, 0,
+        int sent = sendto(socket_fd_, &packet, sizeof(packet) - sizeof(packet.data) + size, 0,
                (struct sockaddr*)&server_addr_, sizeof(server_addr_));
+        
+        if (sent > 0) {
+            std::cout << "发送音频包: 大小=" << sent << " bytes, 序列=" << packet.sequence << std::endl;
+        } else {
+            std::cout << "发送音频包失败: " << strerror(errno) << std::endl;
+        }
     }
     
     void ProcessNetworkMessage(const char* buffer, int size, const struct sockaddr_in& from_addr) {
@@ -445,11 +451,13 @@ private:
             
             // 检查是否是其他用户的音频包
             uint32_t my_id = std::hash<std::string>{}(config_.user_id);
-            if (packet->user_id != my_id) {
+            uint32_t packet_user_id = ntohl(packet->user_id);
+            if (packet_user_id != my_id) {
                 // 添加到播放队列
                 std::lock_guard<std::mutex> lock(audio_queue_mutex_);
                 if (audio_queue_.size() < 10) { // 限制队列大小
                     audio_queue_.push(*packet);
+                    std::cout << "收到音频包: 大小=" << size << " bytes, 队列大小=" << audio_queue_.size() << std::endl;
                 }
             }
         } else {
