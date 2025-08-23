@@ -333,7 +333,7 @@ private:
     }
     
     void AudioLoop() {
-        const int frame_size = config_.audio_config.sample_rate * config_.audio_config.channels * 2 / 50; // 20ms
+        const int frame_size = config_.audio_config.sample_rate * config_.audio_config.channels * 2 / 100; // 10ms
         std::vector<int16_t> audio_buffer(frame_size);
         std::vector<int16_t> silence_buffer(frame_size, 0);
         
@@ -398,7 +398,7 @@ private:
                 }
             }
             
-            std::this_thread::sleep_for(std::chrono::milliseconds(20)); // 50Hz
+            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // 100Hz
         }
         
         std::cout << "Audio loop stopped" << std::endl;
@@ -434,7 +434,7 @@ private:
     
     void SendAudioPacket(const void* data, size_t size) {
         // 限制音频数据大小，避免UDP包过大
-        const size_t max_audio_size = 960; // 限制为960字节，确保总包大小不超过1024
+        const size_t max_audio_size = 1200; // 增加音频数据大小，提高音质
         
         if (size > max_audio_size) {
             size = max_audio_size;
