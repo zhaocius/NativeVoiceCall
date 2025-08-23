@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# 查找依赖
+find_dependency(Threads REQUIRED)
+
+# 包含目标文件
+include("${CMAKE_CURRENT_LIST_DIR}/voice_callTargets.cmake")
+
+# 检查兼容性
+check_required_components(voice_call)

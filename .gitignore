@@ -1,0 +1,129 @@
+# C++ 编译输出
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+
+# CMake 构建目录
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# 可执行文件
+udp_server
+voice_call_client
+test_*
+
+# 动态库
+libvoice_call.dylib
+libvoice_call.so
+libvoice_call.dll
+
+# 目标文件
+*.o
+
+# Android 相关
+android_client/.gradle/
+android_client/build/
+android_client/app/build/
+android_client/local.properties
+android_client/.idea/
+android_client/*.iml
+android_client/app/release/
+android_client/app/debug/
+
+# macOS 相关
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# IDE 相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 依赖目录
+node_modules/
+vendor/
+
+# 环境文件
+.env
+.env.local
+.env.*.local
+
+# 系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 项目特定文件
+# 编译后的服务器和客户端
+server/udp_server
+linux_client/build/
+core/build/
+core/libvoice_call.*
+
+# 测试文件
+test_*
+*_test
+*_test.cpp
+
+# 文档生成
+docs/_build/
+docs/html/
+docs/latex/
+
+# 包文件
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# 备份文件
+*.orig
+*.rej
+*.patch
+
+# 本地配置文件
+config.local.*
+settings.local.*
+
+
