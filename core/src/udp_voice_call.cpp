@@ -373,6 +373,12 @@ private:
                     // 转换字节序
                     uint16_t data_size = ntohs(packet.data_size);
                     
+                    // 安全检查
+                    if (data_size > sizeof(packet.data) || data_size == 0) {
+                        std::cout << "警告: 无效的音频数据大小: " << data_size << std::endl;
+                        continue;
+                    }
+                    
                     // 应用音量
                     std::vector<int16_t> playback_buffer(data_size / 2);
                     memcpy(playback_buffer.data(), packet.data, data_size);
@@ -389,11 +395,14 @@ private:
                     }
                 } else {
                     // 播放静音以避免音频设备停止
-                    snd_pcm_sframes_t frames = snd_pcm_writei(audio_playback_handle_, 
-                                                             silence_buffer.data(), 
-                                                             silence_buffer.size() / config_.audio_config.channels);
-                    if (frames < 0) {
-                        snd_pcm_recover(audio_playback_handle_, frames, 0);
+                    size_t silence_frames = silence_buffer.size() / config_.audio_config.channels;
+                    if (silence_frames > 0) {
+                        snd_pcm_sframes_t frames = snd_pcm_writei(audio_playback_handle_, 
+                                                                 silence_buffer.data(), 
+                                                                 silence_frames);
+                        if (frames < 0) {
+                            snd_pcm_recover(audio_playback_handle_, frames, 0);
+                        }
                     }
                 }
             }
