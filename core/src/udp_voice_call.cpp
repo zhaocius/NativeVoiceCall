@@ -466,7 +466,7 @@ private:
     }
     
     void ProcessNetworkMessage(const char* buffer, int size, const struct sockaddr_in& from_addr) {
-        if (size >= sizeof(AudioPacket)) {
+        if (size >= 16) { // AudioPacket的最小大小（头部）
             const AudioPacket* packet = reinterpret_cast<const AudioPacket*>(buffer);
             
             // 检查是否是其他用户的音频包
