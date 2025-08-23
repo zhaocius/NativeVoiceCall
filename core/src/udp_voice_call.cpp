@@ -447,8 +447,13 @@ private:
         int sent = sendto(socket_fd_, &packet, packet_size, 0,
                (struct sockaddr*)&server_addr_, sizeof(server_addr_));
         
+        static auto last_send_print = std::chrono::steady_clock::now();
+        auto now = std::chrono::steady_clock::now();
         if (sent > 0) {
-            std::cout << "发送音频包: 原始大小=" << size << ", 包大小=" << packet_size << ", 发送=" << sent << " bytes, 序列=" << ntohl(packet.sequence) << std::endl;
+            if (now - last_send_print > std::chrono::seconds(5)) {
+                std::cout << "发送音频包: 原始大小=" << size << ", 包大小=" << packet_size << ", 发送=" << sent << " bytes, 序列=" << ntohl(packet.sequence) << std::endl;
+                last_send_print = now;
+            }
         } else {
             std::cout << "发送音频包失败: " << strerror(errno) << std::endl;
         }
@@ -466,7 +471,12 @@ private:
                 std::lock_guard<std::mutex> lock(audio_queue_mutex_);
                 if (audio_queue_.size() < 10) { // 限制队列大小
                     audio_queue_.push(*packet);
-                    std::cout << "收到音频包: 大小=" << size << " bytes, 队列大小=" << audio_queue_.size() << std::endl;
+                    static auto last_recv_print = std::chrono::steady_clock::now();
+                    auto now = std::chrono::steady_clock::now();
+                    if (now - last_recv_print > std::chrono::seconds(5)) {
+                        std::cout << "收到音频包: 大小=" << size << " bytes, 队列大小=" << audio_queue_.size() << std::endl;
+                        last_recv_print = now;
+                    }
                 }
             }
         } else {

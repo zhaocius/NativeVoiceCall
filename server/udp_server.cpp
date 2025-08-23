@@ -139,8 +139,13 @@ private:
                                    (struct sockaddr*)&client_addr, &client_len);
             if (received > 0) {
                 buffer[received] = '\0';
-                std::cout << "收到UDP包: 大小=" << received << " bytes, 来自=" 
-                          << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << std::endl;
+                static auto last_print = std::chrono::steady_clock::now();
+                auto now = std::chrono::steady_clock::now();
+                if (now - last_print > std::chrono::seconds(5)) {
+                    std::cout << "收到UDP包: 大小=" << received << " bytes, 来自=" 
+                              << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << std::endl;
+                    last_print = now;
+                }
                 ProcessMessage(buffer, received, client_addr);
             }
         }
@@ -157,10 +162,15 @@ private:
             uint16_t raw_data_size = *reinterpret_cast<const uint16_t*>(message + 12);
             uint16_t data_size = ntohs(raw_data_size);
             
-            std::cout << "尝试解析音频包: length=" << length << ", sequence=" << sequence 
-                      << ", timestamp=" << timestamp << ", user_id=" << user_id 
-                      << ", raw_data_size=0x" << std::hex << raw_data_size << std::dec
-                      << ", data_size=" << data_size << ", 验证=" << (data_size <= 2048 && length >= (14 + data_size)) << std::endl;
+            static auto last_audio_print = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_audio_print > std::chrono::seconds(5)) {
+                std::cout << "尝试解析音频包: length=" << length << ", sequence=" << sequence 
+                          << ", timestamp=" << timestamp << ", user_id=" << user_id 
+                          << ", raw_data_size=0x" << std::hex << raw_data_size << std::dec
+                          << ", data_size=" << data_size << ", 验证=" << (data_size <= 2048 && length >= (14 + data_size)) << std::endl;
+                last_audio_print = now;
+            }
             
             // 验证数据大小是否合理
             if (data_size <= 2048 && length >= (14 + data_size)) {
@@ -181,9 +191,14 @@ private:
                     
                     if (room_pair.second.find(client_key) != room_pair.second.end()) {
                         // 找到房间，广播音频包
-                        std::cout << "转发音频包: 房间=" << room_pair.first 
-                                  << ", 用户=" << client_key 
-                                  << ", 数据大小=" << data_size << " bytes" << std::endl;
+                        static auto last_forward_print = std::chrono::steady_clock::now();
+                        auto now = std::chrono::steady_clock::now();
+                        if (now - last_forward_print > std::chrono::seconds(5)) {
+                            std::cout << "转发音频包: 房间=" << room_pair.first 
+                                      << ", 用户=" << client_key 
+                                      << ", 数据大小=" << data_size << " bytes" << std::endl;
+                            last_forward_print = now;
+                        }
                         BroadcastAudioPacket(room_pair.first, message, length, from_addr);
                         return;
                     }
@@ -291,8 +306,14 @@ private:
                 if (client.addr.sin_addr.s_addr != exclude_addr.sin_addr.s_addr ||
                     client.addr.sin_port != exclude_addr.sin_port) {
                     
-                    sendto(server_fd_, data, length, 0,
+                    int sent = sendto(server_fd_, data, length, 0,
                            (struct sockaddr*)&client.addr, sizeof(client.addr));
+                    static auto last_send_print = std::chrono::steady_clock::now();
+                    auto now = std::chrono::steady_clock::now();
+                    if (now - last_send_print > std::chrono::seconds(5)) {
+                        std::cout << "转发音频包到 " << client_key << ": 发送=" << sent << " bytes" << std::endl;
+                        last_send_print = now;
+                    }
                 }
             }
         }
