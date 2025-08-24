@@ -9,15 +9,24 @@
 #include <cstdlib>
 #include <sys/select.h>
 #include <unistd.h>
+#include <random>
 
 std::atomic<bool> g_running(true);
 voice_call_handle_t g_voice_call = nullptr;
+
+// 生成随机用户ID
+std::string generate_random_user_id() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(1000, 9999);
+    return "linux_user" + std::to_string(dis(gen));
+}
 
 // 默认配置
 std::string g_server_ip = "127.0.0.1";
 int g_server_port = 8080;
 std::string g_room_id = "test_room";
-std::string g_user_id = "linux_user";
+std::string g_user_id = generate_random_user_id();
 
 // 显示使用帮助
 void show_usage(const char* program_name) {
@@ -264,7 +273,7 @@ int main(int argc, char* argv[]) {
     strcpy(config.room_id, g_room_id.c_str());
     strcpy(config.user_id, g_user_id.c_str());
     
-    config.audio_config.sample_rate = 48000;
+    config.audio_config.sample_rate = 16000;  // 16kHz 对语音通话更合适
     config.audio_config.channels = 1;
     config.audio_config.bits_per_sample = 16;
     config.audio_config.frame_size = 20;

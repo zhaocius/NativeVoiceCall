@@ -300,11 +300,22 @@ private:
             return false;
         }
         
+        // 准备音频设备
+        err = snd_pcm_prepare(audio_capture_handle_);
+        if (err < 0) {
+            std::cerr << "Failed to prepare capture device: " << snd_strerror(err) << std::endl;
+        }
+        
+        err = snd_pcm_prepare(audio_playback_handle_);
+        if (err < 0) {
+            std::cerr << "Failed to prepare playback device: " << snd_strerror(err) << std::endl;
+        }
+        
         std::cout << "Audio devices initialized successfully" << std::endl;
         std::cout << "Sample rate: " << config_.audio_config.sample_rate << " Hz" << std::endl;
         std::cout << "Channels: " << config_.audio_config.channels << std::endl;
-        std::cout << "Buffer size: " << buffer_size << " bytes" << std::endl;
-        std::cout << "Period size: " << period_size << " bytes" << std::endl;
+        std::cout << "Buffer size: " << buffer_size << " frames" << std::endl;
+        std::cout << "Period size: " << period_size << " frames" << std::endl;
         return true;
     }
     
@@ -371,6 +382,13 @@ private:
             // 播放接收到的音频
             if (audio_playback_handle_) {
                 std::lock_guard<std::mutex> lock(audio_queue_mutex_);
+                static auto last_queue_print = std::chrono::steady_clock::now();
+                auto now = std::chrono::steady_clock::now();
+                if (now - last_queue_print > std::chrono::seconds(5)) {
+                    std::cout << "音频队列状态: 大小=" << audio_queue_.size() << std::endl;
+                    last_queue_print = now;
+                }
+                
                 if (!audio_queue_.empty()) {
                     AudioPacket packet = audio_queue_.front();
                     audio_queue_.pop();
@@ -392,11 +410,23 @@ private:
                         playback_buffer[i] = static_cast<int16_t>(playback_buffer[i] * speaker_volume_);
                     }
                     
+                    size_t frames_to_write = playback_buffer.size() / config_.audio_config.channels;
                     snd_pcm_sframes_t frames = snd_pcm_writei(audio_playback_handle_, 
                                                              playback_buffer.data(), 
-                                                             playback_buffer.size() / config_.audio_config.channels);
+                                                             frames_to_write);
                     if (frames < 0) {
+                        std::cout << "音频播放错误: " << snd_strerror(frames) << std::endl;
                         snd_pcm_recover(audio_playback_handle_, frames, 0);
+                    } else if (frames != frames_to_write) {
+                        std::cout << "音频播放不完整: 期望=" << frames_to_write << ", 实际=" << frames << std::endl;
+                    } else {
+                        static auto last_play_print = std::chrono::steady_clock::now();
+                        auto now = std::chrono::steady_clock::now();
+                        if (now - last_play_print > std::chrono::seconds(5)) {
+                            std::cout << "播放音频: 帧数=" << frames << ", 缓冲区大小=" << playback_buffer.size() 
+                                      << ", 数据大小=" << data_size << " bytes" << std::endl;
+                            last_play_print = now;
+                        }
                     }
                 } else {
                     // 播放静音以避免音频设备停止
@@ -486,6 +516,15 @@ private:
             // 检查是否是其他用户的音频包
             uint32_t my_id = std::hash<std::string>{}(config_.user_id);
             uint32_t packet_user_id = ntohl(packet->user_id);
+            
+            static auto last_id_print = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_id_print > std::chrono::seconds(5)) {
+                std::cout << "用户ID检查: 我的ID=" << my_id << ", 包中ID=" << packet_user_id 
+                          << ", 匹配=" << (packet_user_id != my_id ? "是" : "否") << std::endl;
+                last_id_print = now;
+            }
+            
             if (packet_user_id != my_id) {
                 // 添加到播放队列
                 std::lock_guard<std::mutex> lock(audio_queue_mutex_);
@@ -494,7 +533,8 @@ private:
                     static auto last_recv_print = std::chrono::steady_clock::now();
                     auto now = std::chrono::steady_clock::now();
                     if (now - last_recv_print > std::chrono::seconds(5)) {
-                        std::cout << "收到音频包: 大小=" << size << " bytes, 队列大小=" << audio_queue_.size() << std::endl;
+                        std::cout << "收到音频包: 大小=" << size << " bytes, 队列大小=" << audio_queue_.size() 
+                                  << ", 用户ID=" << ntohl(packet->user_id) << ", 数据大小=" << ntohs(packet->data_size) << std::endl;
                         last_recv_print = now;
                     }
                 }
