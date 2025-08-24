@@ -7,6 +7,8 @@
 #include <atomic>
 #include <cstring>
 #include <cstdlib>
+#include <sys/select.h>
+#include <unistd.h>
 
 std::atomic<bool> g_running(true);
 voice_call_handle_t g_voice_call = nullptr;
@@ -293,7 +295,34 @@ int main(int argc, char* argv[]) {
     std::string command;
     while (g_running) {
         std::cout << "\n> ";
-        std::getline(std::cin, command);
+        std::cout.flush();
+        
+        // 使用select检查输入是否可用，以便能够响应信号
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        
+        struct timeval timeout;
+        timeout.tv_sec = 1;  // 1秒超时
+        timeout.tv_usec = 0;
+        
+        int result = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &timeout);
+        
+        if (result < 0) {
+            // select错误，可能是被信号中断
+            if (errno == EINTR) {
+                continue;
+            }
+            break;
+        } else if (result == 0) {
+            // 超时，继续循环
+            continue;
+        }
+        
+        // 有输入可用
+        if (!std::getline(std::cin, command)) {
+            break;
+        }
         
         if (command == "connect") {
             if (voice_call_connect(g_voice_call) == VOICE_CALL_SUCCESS) {

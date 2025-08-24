@@ -58,11 +58,16 @@ public:
     }
     
     voice_call_error_t Connect() {
-        if (state_ != VOICE_CALL_STATE_IDLE) {
+        if (state_ != VOICE_CALL_STATE_IDLE && state_ != VOICE_CALL_STATE_DISCONNECTED) {
             return VOICE_CALL_ERROR_ALREADY_IN_CALL;
         }
         
         SetState(VOICE_CALL_STATE_CONNECTING);
+        
+        // 重置状态为IDLE，以便后续可以重新连接
+        if (state_ == VOICE_CALL_STATE_DISCONNECTED) {
+            state_ = VOICE_CALL_STATE_IDLE;
+        }
         
         // 解析服务器地址
         std::string server_url = config_.server_url;
