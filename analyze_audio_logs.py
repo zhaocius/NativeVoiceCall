@@ -88,6 +88,21 @@ class AudioLogAnalyzer:
                     'line': line.strip()
                 })
         
+        # 新的服务器音频包解析日志
+        elif '[SERVER_LOG] 尝试解析音频包' in line:
+            match = re.search(r'\[SERVER_LOG\] 尝试解析音频包: length=(\d+), sequence=(\d+), timestamp=(\d+), user_id=(\d+), raw_data_size=0x([0-9a-fA-F]+), data_size=(\d+), 验证=(\d+)', line)
+            if match:
+                self.server_audio_logs.append({
+                    'length': int(match.group(1)),
+                    'sequence': int(match.group(2)),
+                    'timestamp': int(match.group(3)),
+                    'user_id': int(match.group(4)),
+                    'raw_data_size_hex': match.group(5),
+                    'data_size': int(match.group(6)),
+                    'validation': int(match.group(7)) == 1,
+                    'line': line.strip()
+                })
+        
         # 错误日志
         elif '[AUDIO_ERROR]' in line:
             self.errors.append(line.strip())
@@ -250,12 +265,34 @@ class AudioLogAnalyzer:
         print(f"服务器接收数据大小范围: {min(data_sizes)} - {max(data_sizes)} bytes")
         print(f"服务器接收包长度范围: {min(lengths)} - {max(lengths)} bytes")
         
-        # 分析验证结果
-        condition1_passed = sum(1 for log in self.server_audio_logs if log['condition1'])
-        condition2_passed = sum(1 for log in self.server_audio_logs if log['condition2'])
+        # 分析序列号
+        if 'sequence' in self.server_audio_logs[0]:
+            sequences = [log['sequence'] for log in self.server_audio_logs]
+            print(f"音频包序列号范围: {min(sequences)} - {max(sequences)}")
+            
+            # 检查序列号连续性
+            sequence_gaps = []
+            for i in range(1, len(sequences)):
+                gap = sequences[i] - sequences[i-1]
+                if gap != 1:
+                    sequence_gaps.append(gap)
+            
+            if sequence_gaps:
+                print(f"发现序列号跳跃: {sequence_gaps}")
+            else:
+                print("序列号连续，无跳跃")
         
-        print(f"条件1通过率: {condition1_passed}/{len(self.server_audio_logs)} ({condition1_passed/len(self.server_audio_logs)*100:.1f}%)")
-        print(f"条件2通过率: {condition2_passed}/{len(self.server_audio_logs)} ({condition2_passed/len(self.server_audio_logs)*100:.1f}%)")
+        # 分析验证结果
+        if 'validation' in self.server_audio_logs[0]:
+            validation_passed = sum(1 for log in self.server_audio_logs if log['validation'])
+            print(f"音频包验证通过率: {validation_passed}/{len(self.server_audio_logs)} ({validation_passed/len(self.server_audio_logs)*100:.1f}%)")
+        else:
+            # 旧格式的验证分析
+            condition1_passed = sum(1 for log in self.server_audio_logs if log.get('condition1', False))
+            condition2_passed = sum(1 for log in self.server_audio_logs if log.get('condition2', False))
+            
+            print(f"条件1通过率: {condition1_passed}/{len(self.server_audio_logs)} ({condition1_passed/len(self.server_audio_logs)*100:.1f}%)")
+            print(f"条件2通过率: {condition2_passed}/{len(self.server_audio_logs)} ({condition2_passed/len(self.server_audio_logs)*100:.1f}%)")
         
         print()
     

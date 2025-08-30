@@ -29,18 +29,6 @@ if(NOT ALSA_FOUND)
     endif()
 endif()
 
-# 查找WebRTC（如果可用）
-find_package(PkgConfig QUIET)
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(WEBRTC QUIET webrtc)
-endif()
-
-# 如果没有找到WebRTC，使用简化版本
-if(NOT WEBRTC_FOUND)
-    message(STATUS "WebRTC not found, using simplified implementation")
-    add_definitions(-DSIMPLIFIED_IMPLEMENTATION)
-endif()
-
 # 包含目录
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -70,13 +58,6 @@ if(ALSA_FOUND)
     if(ALSA_INCLUDE_DIRS)
         target_include_directories(voice_call PRIVATE ${ALSA_INCLUDE_DIRS})
     endif()
-endif()
-
-# 如果找到WebRTC，链接它
-if(WEBRTC_FOUND)
-    target_link_libraries(voice_call ${WEBRTC_LIBRARIES})
-    target_include_directories(voice_call PRIVATE ${WEBRTC_INCLUDE_DIRS})
-    target_compile_options(voice_call PRIVATE ${WEBRTC_CFLAGS_OTHER})
 endif()
 
 # 安装规则
