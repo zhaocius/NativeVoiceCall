@@ -109,9 +109,13 @@ public:
         running_ = true;
         server_thread_ = std::thread(&UDPServer::ServerLoop, this);
         
-        // 等待用户输入退出
-        std::cout << "Press Enter to stop server..." << std::endl;
-        std::cin.get();
+        // 持续运行，直到被信号中断
+        std::cout << "Server is running. Press Ctrl+C to stop..." << std::endl;
+        
+        // 等待信号
+        while (running_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
         
         Stop();
     }
@@ -139,13 +143,7 @@ private:
                                    (struct sockaddr*)&client_addr, &client_len);
             if (received > 0) {
                 buffer[received] = '\0';
-                static auto last_print = std::chrono::steady_clock::now();
-                auto now = std::chrono::steady_clock::now();
-                if (now - last_print > std::chrono::seconds(5)) {
-                    std::cout << "收到UDP包: 大小=" << received << " bytes, 来自=" 
-                              << inet_ntoa(client_addr.sin_addr) << ":" << ntohs(client_addr.sin_port) << std::endl;
-                    last_print = now;
-                }
+                            // 移除UDP包接收日志，只保留用户状态变化
                 ProcessMessage(buffer, received, client_addr);
             }
         }
@@ -153,37 +151,15 @@ private:
     
     void ProcessMessage(const char* message, int length, const struct sockaddr_in& from_addr) {
         try {
-            std::cout << "处理消息: 长度=" << length << ", 来自=" << inet_ntoa(from_addr.sin_addr) 
-                      << ":" << ntohs(from_addr.sin_port) << std::endl;
-            
-            // 打印前32个字节的十六进制内容
-            std::cout << "消息内容(hex): ";
-            for (int i = 0; i < std::min(length, 32); i++) {
-                printf("%02x ", (unsigned char)message[i]);
-            }
-            std::cout << std::endl;
-            
-            // 尝试打印为字符串
-            std::cout << "消息内容(str): ";
-            for (int i = 0; i < std::min(length, 32); i++) {
-                char c = message[i];
-                if (c >= 32 && c <= 126) {
-                    std::cout << c;
-                } else {
-                    std::cout << ".";
-                }
-            }
-            std::cout << std::endl;
+            // 移除详细的消息处理日志，只保留用户状态变化
         
             // 首先检查是否是字符串消息
             std::string msg(message, length);
             
             if (msg.find("JOIN:") == 0) {
-                std::cout << "收到JOIN消息: " << msg << " 来自: " << inet_ntoa(from_addr.sin_addr) << ":" << ntohs(from_addr.sin_port) << std::endl;
                 HandleJoin(msg, from_addr);
                 return;
             } else if (msg.find("LEAVE:") == 0) {
-                std::cout << "收到LEAVE消息: " << msg << " 来自: " << inet_ntoa(from_addr.sin_addr) << ":" << ntohs(from_addr.sin_port) << std::endl;
                 HandleLeave(msg, from_addr);
                 return;
             }
@@ -204,22 +180,18 @@ private:
                     std::cout << "尝试解析音频包: length=" << length << ", sequence=" << sequence 
                               << ", timestamp=" << timestamp << ", user_id=" << user_id 
                               << ", raw_data_size=0x" << std::hex << raw_data_size << std::dec
-                              << ", data_size=" << data_size << ", 验证=" << (data_size <= 1024 && length == (14 + data_size)) << std::endl;
+                              << ", data_size=" << data_size << ", 验证=" << (data_size <= 1024 && length >= (14 + data_size)) << std::endl;
                     last_audio_print = now;
                 }
                 
                 // 验证数据大小是否合理（最大1024字节，与AudioPacket结构体一致）
-                std::cout << "音频包验证: data_size=" << data_size << ", length=" << length 
-                          << ", 验证条件1=" << (data_size <= 1024) 
-                          << ", 验证条件2=" << (length == (14 + data_size)) << std::endl;
-                if (data_size <= 1024 && length == (14 + data_size)) {
+                // 音频包验证日志已移除，只保留用户状态变化
+                if (data_size <= 1024 && length >= (14 + data_size)) {
                     // 这是一个AudioPacket，直接广播给房间内其他用户
                     std::string client_key = inet_ntoa(from_addr.sin_addr) + std::string(":") + 
                                            std::to_string(ntohs(from_addr.sin_port));
                     
-                    // 查找用户所在的房间
-                    std::cout << "查找用户房间: " << client_key << std::endl;
-                    std::cout << "当前房间数量: " << rooms_.size() << std::endl;
+                            // 查找用户所在的房间
                     
                     // 检查客户端是否在客户端列表中
                     if (clients_.find(client_key) == clients_.end()) {
@@ -228,7 +200,7 @@ private:
                     }
                     
                     std::string user_room_id = clients_[client_key].room_id;
-                    std::cout << "用户 " << client_key << " 在房间: " << user_room_id << std::endl;
+
                     
                     // 检查房间是否存在
                     if (rooms_.find(user_room_id) == rooms_.end()) {
@@ -236,132 +208,99 @@ private:
                         return;
                     }
                     
-                    // 检查用户是否在房间中
-                    if (rooms_[user_room_id].find(client_key) == rooms_[user_room_id].end()) {
-                        std::cout << "警告: 用户 " << client_key << " 不在房间 " << user_room_id << " 中，忽略音频包" << std::endl;
-                        return;
-                    }
+                                    // 检查用户是否在房间中
+                if (rooms_[user_room_id].find(client_key) == rooms_[user_room_id].end()) {
+                    return;
+                }
                     
                     // 找到房间，广播音频包
-                    std::cout << "找到用户房间，准备转发音频包: 房间=" << user_room_id 
-                              << ", 用户=" << client_key 
-                              << ", 数据大小=" << data_size << " bytes" << std::endl;
                     BroadcastAudioPacket(user_room_id, message, length, from_addr);
-                    std::cout << "音频包转发完成" << std::endl;
                     return;
                 } else {
-                    // 音频包验证失败，记录日志但不继续处理
-                    std::cout << "音频包验证失败，忽略此消息" << std::endl;
+                                    // 音频包验证失败，忽略此消息
                     return;
                 }
             }
             
-            // 如果既不是字符串消息也不是音频包，记录未知消息
-            std::cout << "收到未知消息类型，忽略" << std::endl;
+            // 如果既不是字符串消息也不是音频包，忽略
         } catch (const std::exception& e) {
-            std::cout << "处理消息时发生异常: " << e.what() << std::endl;
+            std::cerr << "[SERVER_LOG] 处理消息时发生异常: " << e.what() << std::endl;
         } catch (...) {
-            std::cout << "处理消息时发生未知异常" << std::endl;
+            std::cerr << "[SERVER_LOG] 处理消息时发生未知异常" << std::endl;
         }
     }
     
     void HandleJoin(const std::string& message, const struct sockaddr_in& from_addr) {
         try {
-            std::cout << "开始处理JOIN消息..." << std::endl;
             size_t pos1 = message.find(':', 5);
-            std::cout << "解析JOIN消息: " << message << ", pos1=" << pos1 << std::endl;
             
             if (pos1 != std::string::npos) {
                 std::string room_id = message.substr(5, pos1 - 5);
                 std::string user_id = message.substr(pos1 + 1);
-                std::cout << "解析结果: room_id=" << room_id << ", user_id=" << user_id << std::endl;
                 
                 // 记录用户
                 std::string client_key = inet_ntoa(from_addr.sin_addr) + std::string(":") + 
                                        std::to_string(ntohs(from_addr.sin_port));
-                std::cout << "客户端key: " << client_key << std::endl;
                 
                 clients_[client_key] = {user_id, room_id, from_addr};
-                std::cout << "用户记录已添加" << std::endl;
                 
                 // 添加到房间
                 rooms_[room_id].insert(client_key);
-                std::cout << "用户已添加到房间" << std::endl;
                 
+                // 只打印用户状态变化到控制台
                 std::cout << "User " << user_id << " joined room " << room_id << std::endl;
                 
                 // 发送JOIN_OK响应给客户端
                 std::string response = "JOIN_OK:" + room_id + ":" + user_id;
-                std::cout << "准备发送响应: " << response << std::endl;
                 sendto(server_fd_, response.c_str(), response.length(), 0,
                        (struct sockaddr*)&from_addr, sizeof(from_addr));
-                std::cout << "JOIN_OK响应已发送" << std::endl;
                 
                 // 广播给房间内其他用户
-                std::cout << "准备广播给房间内其他用户..." << std::endl;
                 BroadcastToRoom(room_id, "JOIN:" + room_id + ":" + user_id, from_addr);
-                std::cout << "广播完成" << std::endl;
-            } else {
-                std::cout << "Invalid JOIN message format: " << message << std::endl;
             }
         } catch (const std::exception& e) {
-            std::cout << "HandleJoin异常: " << e.what() << std::endl;
+            std::cerr << "[SERVER_LOG] HandleJoin异常: " << e.what() << std::endl;
         } catch (...) {
-            std::cout << "HandleJoin发生未知异常" << std::endl;
+            std::cerr << "[SERVER_LOG] HandleJoin发生未知异常" << std::endl;
         }
     }
     
     void HandleLeave(const std::string& message, const struct sockaddr_in& from_addr) {
         try {
-            std::cout << "开始处理LEAVE消息..." << std::endl;
             size_t pos1 = message.find(':', 6);
-            std::cout << "解析LEAVE消息: " << message << ", pos1=" << pos1 << std::endl;
             
             if (pos1 != std::string::npos) {
                 std::string room_id = message.substr(6, pos1 - 6);
                 std::string user_id = message.substr(pos1 + 1);
-                std::cout << "解析结果: room_id=" << room_id << ", user_id=" << user_id << std::endl;
                 
                 std::string client_key = inet_ntoa(from_addr.sin_addr) + std::string(":") + 
                                        std::to_string(ntohs(from_addr.sin_port));
-                std::cout << "客户端key: " << client_key << std::endl;
                 
                 // 从房间移除
                 if (rooms_.find(room_id) != rooms_.end()) {
-                    std::cout << "从房间 " << room_id << " 移除用户 " << client_key << std::endl;
                     rooms_[room_id].erase(client_key);
                     if (rooms_[room_id].empty()) {
-                        std::cout << "房间 " << room_id << " 为空，删除房间" << std::endl;
                         rooms_.erase(room_id);
                     }
-                } else {
-                    std::cout << "警告: 房间 " << room_id << " 不存在" << std::endl;
                 }
                 
                 // 从客户端列表移除
                 if (clients_.find(client_key) != clients_.end()) {
-                    std::cout << "从客户端列表移除 " << client_key << std::endl;
                     clients_.erase(client_key);
-                } else {
-                    std::cout << "警告: 客户端 " << client_key << " 不在客户端列表中" << std::endl;
                 }
                 
+                // 只打印用户状态变化到控制台
                 std::cout << "User " << user_id << " left room " << room_id << std::endl;
                 
                 // 广播给房间内其他用户
                 if (rooms_.find(room_id) != rooms_.end()) {
-                    std::cout << "准备广播LEAVE消息给房间内其他用户..." << std::endl;
                     BroadcastToRoom(room_id, "LEAVE:" + room_id + ":" + user_id, from_addr);
-                } else {
-                    std::cout << "房间已删除，跳过广播" << std::endl;
                 }
-            } else {
-                std::cout << "Invalid LEAVE message format: " << message << std::endl;
             }
         } catch (const std::exception& e) {
-            std::cout << "HandleLeave异常: " << e.what() << std::endl;
+            std::cerr << "[SERVER_LOG] HandleLeave异常: " << e.what() << std::endl;
         } catch (...) {
-            std::cout << "HandleLeave发生未知异常" << std::endl;
+            std::cerr << "[SERVER_LOG] HandleLeave发生未知异常" << std::endl;
         }
     }
     
@@ -375,35 +314,18 @@ private:
                 return;
             }
             
-            std::cout << "广播消息到房间 " << room_id << ": " << message << std::endl;
-            std::cout << "房间中的客户端数量: " << rooms_[room_id].size() << std::endl;
-            
             for (const auto& client_key : rooms_[room_id]) {
-                std::cout << "检查客户端: " << client_key << std::endl;
                 if (clients_.find(client_key) != clients_.end()) {
                     const auto& client = clients_[client_key];
-                    std::cout << "客户端地址: " << inet_ntoa(client.addr.sin_addr) << ":" << ntohs(client.addr.sin_port) << std::endl;
-                    std::cout << "排除地址: " << inet_ntoa(exclude_addr.sin_addr) << ":" << ntohs(exclude_addr.sin_port) << std::endl;
                     
                     if (client.addr.sin_addr.s_addr != exclude_addr.sin_addr.s_addr ||
                         client.addr.sin_port != exclude_addr.sin_port) {
                         
-                        std::cout << "准备发送广播消息到: " << client_key << std::endl;
-                        int sent = sendto(server_fd_, message.c_str(), message.length(), 0,
+                        sendto(server_fd_, message.c_str(), message.length(), 0,
                                (struct sockaddr*)&client.addr, sizeof(client.addr));
-                        if (sent > 0) {
-                            std::cout << "广播消息发送到 " << client_key << ": " << sent << " bytes" << std::endl;
-                        } else {
-                            std::cout << "广播消息发送失败到 " << client_key << ": " << strerror(errno) << std::endl;
-                        }
-                    } else {
-                        std::cout << "跳过发送给发送者: " << client_key << std::endl;
                     }
-                } else {
-                    std::cout << "警告: 客户端 " << client_key << " 不在客户端列表中" << std::endl;
                 }
             }
-            std::cout << "广播完成" << std::endl;
         } catch (const std::exception& e) {
             std::cout << "BroadcastToRoom异常: " << e.what() << std::endl;
         } catch (...) {
@@ -415,7 +337,6 @@ private:
                              const struct sockaddr_in& exclude_addr) {
         try {
             if (rooms_.find(room_id) == rooms_.end()) {
-                std::cout << "房间 " << room_id << " 不存在，无法转发音频包" << std::endl;
                 return;
             }
             
@@ -425,27 +346,15 @@ private:
                     if (client.addr.sin_addr.s_addr != exclude_addr.sin_addr.s_addr ||
                         client.addr.sin_port != exclude_addr.sin_port) {
                         
-                        int sent = sendto(server_fd_, data, length, 0,
+                        sendto(server_fd_, data, length, 0,
                                (struct sockaddr*)&client.addr, sizeof(client.addr));
-                        static auto last_send_print = std::chrono::steady_clock::now();
-                        auto now = std::chrono::steady_clock::now();
-                        if (now - last_send_print > std::chrono::seconds(5)) {
-                            if (sent > 0) {
-                                std::cout << "转发音频包到 " << client_key << ": 发送=" << sent << " bytes" << std::endl;
-                            } else {
-                                std::cout << "转发音频包失败到 " << client_key << ": " << strerror(errno) << std::endl;
-                            }
-                            last_send_print = now;
-                        }
                     }
-                } else {
-                    std::cout << "警告: 客户端 " << client_key << " 不在客户端列表中，无法转发音频包" << std::endl;
                 }
             }
         } catch (const std::exception& e) {
-            std::cout << "BroadcastAudioPacket异常: " << e.what() << std::endl;
+            std::cerr << "[SERVER_LOG] BroadcastAudioPacket异常: " << e.what() << std::endl;
         } catch (...) {
-            std::cout << "BroadcastAudioPacket发生未知异常" << std::endl;
+            std::cerr << "[SERVER_LOG] BroadcastAudioPacket发生未知异常" << std::endl;
         }
     }
     

@@ -251,6 +251,9 @@ private:
         snd_pcm_uframes_t buffer_size = config_.audio_config.sample_rate * config_.audio_config.channels * 2 / 50;
         snd_pcm_uframes_t period_size = buffer_size / 4;
         
+        // 增加缓冲区大小以减少underrun
+        buffer_size *= 4; // 增加到80ms缓冲区
+        
         // 设置缓冲区大小
         err = snd_pcm_hw_params_set_buffer_size(audio_capture_handle_, hw_params, buffer_size);
         if (err < 0) {
@@ -349,7 +352,7 @@ private:
     }
     
     void AudioLoop() {
-        const int frame_size = config_.audio_config.sample_rate * config_.audio_config.channels * 2 / 100; // 10ms
+        const int frame_size = config_.audio_config.sample_rate * config_.audio_config.channels * 2 / 50; // 20ms
         std::vector<int16_t> audio_buffer(frame_size);
         std::vector<int16_t> silence_buffer(frame_size, 0);
         
@@ -365,8 +368,28 @@ private:
                         audio_buffer[i] = static_cast<int16_t>(audio_buffer[i] * mic_volume_);
                     }
                     
+                    // 记录音频采集日志
+                    static auto last_capture_log = std::chrono::steady_clock::now();
+                    auto now = std::chrono::steady_clock::now();
+                    if (now - last_capture_log > std::chrono::seconds(5)) {
+                        std::cout << "[AUDIO_CAPTURE] frames=" << frames << ", data_size=" << (frames * config_.audio_config.channels * 2) 
+                                  << " bytes, first_sample=" << audio_buffer[0] << ", last_sample=" << audio_buffer[frames * config_.audio_config.channels - 1] 
+                                  << ", mic_volume=" << mic_volume_ << std::endl;
+                        last_capture_log = now;
+                    }
+                    
                     // 发送音频包
-                    SendAudioPacket(audio_buffer.data(), frames * config_.audio_config.channels * 2);
+                    size_t data_size = frames * config_.audio_config.channels * 2;
+                    SendAudioPacket(audio_buffer.data(), data_size);
+                    
+                    // 记录发送日志
+                    static auto last_send_log = std::chrono::steady_clock::now();
+                    auto now_send = std::chrono::steady_clock::now();
+                    if (now_send - last_send_log > std::chrono::seconds(5)) {
+                        std::cout << "[AUDIO_SEND] data_size=" << data_size << " bytes, packet_size=" << (14 + data_size) 
+                                  << " bytes, sequence=" << sequence_ << std::endl;
+                        last_send_log = now_send;
+                    }
                     
                     // 显示音频电平
                     if (callbacks_.on_audio_level) {
@@ -396,15 +419,34 @@ private:
                     // 转换字节序
                     uint16_t data_size = ntohs(packet.data_size);
                     
+                    // 记录接收日志
+                    static auto last_recv_log = std::chrono::steady_clock::now();
+                    auto now_recv = std::chrono::steady_clock::now();
+                    if (now_recv - last_recv_log > std::chrono::seconds(5)) {
+                        std::cout << "[AUDIO_RECV] data_size=" << data_size << " bytes, sequence=" << ntohl(packet.sequence) 
+                                  << ", user_id=" << ntohl(packet.user_id) << std::endl;
+                        last_recv_log = now_recv;
+                    }
+                    
                     // 安全检查
                     if (data_size > sizeof(packet.data) || data_size == 0) {
-                        std::cout << "警告: 无效的音频数据大小: " << data_size << std::endl;
+                        std::cout << "[AUDIO_ERROR] 无效的音频数据大小: " << data_size << std::endl;
                         continue;
                     }
                     
                     // 应用音量
                     std::vector<int16_t> playback_buffer(data_size / 2);
                     memcpy(playback_buffer.data(), packet.data, data_size);
+                    
+                    // 记录播放前音频数据
+                    static auto last_play_debug = std::chrono::steady_clock::now();
+                    auto now_play = std::chrono::steady_clock::now();
+                    if (now_play - last_play_debug > std::chrono::seconds(5)) {
+                        std::cout << "[AUDIO_PLAY_DEBUG] raw_first_sample=" << playback_buffer[0] 
+                                  << ", raw_last_sample=" << playback_buffer[playback_buffer.size()-1] 
+                                  << ", samples_count=" << playback_buffer.size() << std::endl;
+                        last_play_debug = now_play;
+                    }
                     
                     for (int i = 0; i < playback_buffer.size(); ++i) {
                         playback_buffer[i] = static_cast<int16_t>(playback_buffer[i] * speaker_volume_);
@@ -415,16 +457,16 @@ private:
                                                              playback_buffer.data(), 
                                                              frames_to_write);
                     if (frames < 0) {
-                        std::cout << "音频播放错误: " << snd_strerror(frames) << std::endl;
+                        // 静默处理音频错误，避免刷屏
                         snd_pcm_recover(audio_playback_handle_, frames, 0);
                     } else if (frames != frames_to_write) {
-                        std::cout << "音频播放不完整: 期望=" << frames_to_write << ", 实际=" << frames << std::endl;
+                        // 静默处理不完整播放
                     } else {
                         static auto last_play_print = std::chrono::steady_clock::now();
                         auto now = std::chrono::steady_clock::now();
                         if (now - last_play_print > std::chrono::seconds(5)) {
-                            std::cout << "播放音频: 帧数=" << frames << ", 缓冲区大小=" << playback_buffer.size() 
-                                      << ", 数据大小=" << data_size << " bytes" << std::endl;
+                            std::cout << "[AUDIO_PLAY] frames=" << frames << ", buffer_size=" << playback_buffer.size() 
+                                      << ", data_size=" << data_size << " bytes, speaker_volume=" << speaker_volume_ << std::endl;
                             last_play_print = now;
                         }
                     }
@@ -436,6 +478,7 @@ private:
                                                                  silence_buffer.data(), 
                                                                  silence_frames);
                         if (frames < 0) {
+                            // 静默处理静音播放错误
                             snd_pcm_recover(audio_playback_handle_, frames, 0);
                         }
                     }
@@ -478,7 +521,7 @@ private:
     
     void SendAudioPacket(const void* data, size_t size) {
         // 限制音频数据大小，避免UDP包过大
-        const size_t max_audio_size = 640; // 与Android客户端保持一致
+        const size_t max_audio_size = 640; // 20ms音频数据大小
         
         if (size > max_audio_size) {
             size = max_audio_size;
@@ -510,7 +553,7 @@ private:
     }
     
     void ProcessNetworkMessage(const char* buffer, int size, const struct sockaddr_in& from_addr) {
-        if (size >= 16) { // AudioPacket的最小大小（头部）
+        if (size >= 14) { // AudioPacket的最小大小（头部）
             const AudioPacket* packet = reinterpret_cast<const AudioPacket*>(buffer);
             
             // 检查是否是其他用户的音频包

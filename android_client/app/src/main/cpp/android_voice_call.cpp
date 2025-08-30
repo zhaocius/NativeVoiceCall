@@ -198,14 +198,14 @@ public:
                         SetState(VOICE_CALL_STATE_ERROR);
                         LOGE("Failed to join room");
                         break;
-                    } else if (received >= 334 && joined) {
+                    } else if (received >= 654 && joined) {
                         // 只有在成功加入房间后才处理音频数据包
                         LOGI("Received audio packet, playing...");
                         // 添加调试信息
                         static auto last_packet_log = std::chrono::steady_clock::now();
                         auto now = std::chrono::steady_clock::now();
                         if (now - last_packet_log > std::chrono::seconds(5)) {
-                            LOGI("Audio packet debug: received=%zd bytes, expected=974 bytes", received);
+                            LOGI("Audio packet debug: received=%zd bytes, expected=654 bytes", received);
                             last_packet_log = now;
                         }
                         PlayAudioData(buffer, received);
@@ -588,8 +588,34 @@ private:
         
         // 直接复制音频数据并应用音量（音频数据已经是小端序格式）
         std::vector<int16_t> converted_audio(data_size / sizeof(int16_t));
+        
+        // 检查音频数据是否有效
+        bool has_valid_audio = false;
         for (size_t i = 0; i < converted_audio.size(); ++i) {
             converted_audio[i] = static_cast<int16_t>(audio_data[i] * speaker_volume_);
+            if (audio_data[i] != 0) {
+                has_valid_audio = true;
+            }
+        }
+        
+        // 如果没有有效音频数据，跳过播放
+        if (!has_valid_audio) {
+            static auto last_skip_log = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_skip_log > std::chrono::seconds(5)) {
+                LOGI("Skipping silent audio packet");
+                last_skip_log = now;
+            }
+            return;
+        }
+        
+        // 添加音频数据调试信息
+        static auto last_audio_debug = std::chrono::steady_clock::now();
+        auto now_debug = std::chrono::steady_clock::now();
+        if (now_debug - last_audio_debug > std::chrono::seconds(10)) {
+            LOGI("Audio data debug: first_sample=%d, last_sample=%d, samples_count=%zu", 
+                 converted_audio[0], converted_audio[converted_audio.size()-1], converted_audio.size());
+            last_audio_debug = now_debug;
         }
         
         // 将音频数据发送到播放器（data_size是字节数，直接使用）
