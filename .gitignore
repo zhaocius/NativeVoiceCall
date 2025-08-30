@@ -73,6 +73,14 @@ Temporary Items
 # 日志文件
 *.log
 logs/
+log/
+*.log.*
+server.log
+client.log
+audio_*.log
+server_output.log
+client_output.log
+*_output.log
 
 # 临时文件
 *.tmp
