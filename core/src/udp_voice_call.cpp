@@ -478,7 +478,7 @@ private:
     
     void SendAudioPacket(const void* data, size_t size) {
         // 限制音频数据大小，避免UDP包过大
-        const size_t max_audio_size = 960; // 保持960字节，确保包大小合理
+        const size_t max_audio_size = 640; // 与Android客户端保持一致
         
         if (size > max_audio_size) {
             size = max_audio_size;
@@ -493,7 +493,7 @@ private:
         
         memcpy(packet.data, data, size);
         
-        int packet_size = sizeof(packet) - sizeof(packet.data) + size;
+        int packet_size = sizeof(AudioPacket) - sizeof(AudioPacket::data) + size;
         int sent = sendto(socket_fd_, &packet, packet_size, 0,
                (struct sockaddr*)&server_addr_, sizeof(server_addr_));
         

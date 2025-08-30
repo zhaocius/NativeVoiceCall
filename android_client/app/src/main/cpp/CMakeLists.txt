@@ -7,36 +7,21 @@ project("nativevoicecall")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 添加核心库源文件
+# 添加Android专用的语音通话实现和JNI
 add_library(voice_call SHARED
-    ../../../../../core/src/voice_call.cpp
+    android_voice_call.cpp
+    voice_call_jni.cpp
 )
 
 # 设置包含目录
 target_include_directories(voice_call PRIVATE
     ../../../../../core/include
+    ${JNI_INCLUDE_DIRS}
 )
 
 # 链接必要的库
 target_link_libraries(voice_call
     android
     log
-)
-
-# 创建JNI包装库
-add_library(voice_call_jni SHARED
-    voice_call_jni.cpp
-)
-
-# 设置包含目录
-target_include_directories(voice_call_jni PRIVATE
-    ../../../../../core/include
-    ${JNI_INCLUDE_DIRS}
-)
-
-# 链接库
-target_link_libraries(voice_call_jni
-    voice_call
-    android
-    log
+    OpenSLES
 )

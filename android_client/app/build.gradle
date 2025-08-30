@@ -31,11 +31,19 @@ android {
     buildFeatures {
         viewBinding true
     }
+    
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+        }
+    }
+    
+    ndkVersion "21.4.7075529"
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.8.0'
+    implementation 'com.google.android.material:material:1.6.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
     testImplementation 'junit:junit:4.13.2'

@@ -1,0 +1,3 @@
+ninja: Entering directory `/home/zz/Documents/NativeVoiceCall/android_client/app/.cxx/Debug/se3w163d/x86'
+[1/2] Building CXX object CMakeFiles/voice_call.dir/android_voice_call.cpp.o
+[2/2] Linking CXX shared library /home/zz/Documents/NativeVoiceCall/android_client/app/build/intermediates/cxx/Debug/se3w163d/obj/x86/libvoice_call.so

@@ -1,0 +1,8 @@
+Executable : /home/zz/Android/Sdk/cmake/3.10.2.4988404/bin/ninja
+arguments : 
+-C
+/home/zz/Documents/NativeVoiceCall/android_client/app/.cxx/Debug/se3w163d/arm64-v8a
+voice_call
+voice_call_jni
+jvmArgs : 
+

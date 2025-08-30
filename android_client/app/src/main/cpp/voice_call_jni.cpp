@@ -1,6 +1,7 @@
 #include <jni.h>
 #include "voice_call.h"
 #include <android/log.h>
+#include <cstring>
 
 #define LOG_TAG "VoiceCallJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -10,15 +11,20 @@ extern "C" {
 
 JNIEXPORT jlong JNICALL
 Java_com_nativevoicecall_android_VoiceCallManager_initVoiceCall(
-    JNIEnv* env, jobject thiz, jobject config, jobject callbacks) {
+    JNIEnv* env, jobject thiz, jstring serverUrl, jstring roomId, jstring userId) {
     
-    // 简化的配置
+    // 获取Java字符串
+    const char* server_url = env->GetStringUTFChars(serverUrl, 0);
+    const char* room_id = env->GetStringUTFChars(roomId, 0);
+    const char* user_id = env->GetStringUTFChars(userId, 0);
+    
+    // 配置
     voice_call_config_t c_config = {};
-    strcpy(c_config.server_url, "ws://localhost:8080");
-    strcpy(c_config.room_id, "test_room");
-    strcpy(c_config.user_id, "android_user");
+    strcpy(c_config.server_url, server_url);
+    strcpy(c_config.room_id, room_id);
+    strcpy(c_config.user_id, user_id);
     
-    c_config.audio_config.sample_rate = 48000;
+    c_config.audio_config.sample_rate = 16000;
     c_config.audio_config.channels = 1;
     c_config.audio_config.bits_per_sample = 16;
     c_config.audio_config.frame_size = 20;
@@ -32,6 +38,12 @@ Java_com_nativevoicecall_android_VoiceCallManager_initVoiceCall(
     
     voice_call_handle_t handle = voice_call_init(&c_config, &c_callbacks);
     LOGI("Voice call initialized: %p", handle);
+    
+    // 释放字符串
+    env->ReleaseStringUTFChars(serverUrl, server_url);
+    env->ReleaseStringUTFChars(roomId, room_id);
+    env->ReleaseStringUTFChars(userId, user_id);
+    
     return reinterpret_cast<jlong>(handle);
 }
 
