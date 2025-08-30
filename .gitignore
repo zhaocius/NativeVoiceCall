@@ -20,18 +20,40 @@ Makefile
 *.cmake
 !CMakeLists.txt
 
+# 所有构建目录
+**/build/
+**/bin/
+**/lib/
+**/obj/
+**/Debug/
+**/Release/
+**/RelWithDebInfo/
+**/MinSizeRel/
+
 # 可执行文件
 udp_server
 voice_call_client
 test_*
+**/udp_server
+**/voice_call_client
+**/*.exe
+**/*.out
+**/*.app
 
 # 动态库
 libvoice_call.dylib
 libvoice_call.so
 libvoice_call.dll
+**/*.so
+**/*.dylib
+**/*.dll
+**/*.a
+**/*.lib
 
 # 目标文件
 *.o
+**/*.o
+**/*.obj
 
 # Android 相关
 android_client/.gradle/
@@ -42,6 +64,9 @@ android_client/.idea/
 android_client/*.iml
 android_client/app/release/
 android_client/app/debug/
+android_client/app/.cxx/
+android_client/app/build/intermediates/
+android_client/app/build/outputs/
 
 # macOS 相关
 .DS_Store
@@ -108,6 +133,15 @@ server/udp_server
 linux_client/build/
 core/build/
 core/libvoice_call.*
+
+# 所有项目的构建文件
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+**/compile_commands.json
+**/.ninja_deps
+**/.ninja_log
 
 # 测试文件
 test_*

@@ -1,9 +1,0 @@
-ninja: Entering directory `/home/zz/Documents/NativeVoiceCall/android_client/app/.cxx/Debug/se3w163d/x86_64'
-[0/1] Re-running CMake...
--- Configuring done
--- Generating done
--- Build files have been written to: /home/zz/Documents/NativeVoiceCall/android_client/app/.cxx/Debug/se3w163d/x86_64
-[1/4] Building CXX object CMakeFiles/voice_call_jni.dir/voice_call_jni.cpp.o
-[2/4] Building CXX object CMakeFiles/voice_call.dir/android_voice_call.cpp.o
-[3/4] Linking CXX shared library /home/zz/Documents/NativeVoiceCall/android_client/app/build/intermediates/cxx/Debug/se3w163d/obj/x86_64/libvoice_call.so
-[4/4] Linking CXX shared library /home/zz/Documents/NativeVoiceCall/android_client/app/build/intermediates/cxx/Debug/se3w163d/obj/x86_64/libvoice_call_jni.so
